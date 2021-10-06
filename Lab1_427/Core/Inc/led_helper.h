@@ -11,6 +11,7 @@
 void turn_on_green();
 void turn_off_green();
 void turn_on_red();
+void reset_leds();
 void turn_on_only_red();
 void turn_on_only_yellow();
 void turn_on_only_green();

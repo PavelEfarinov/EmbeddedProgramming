@@ -7,6 +7,12 @@
 #include "led_helper.h"
 #include "gpio.h"
 
+void reset_leds(){
+	turn_off_green();
+	turn_off_red();
+	turn_off_yellow();
+}
+
 void turn_on_green() {
 	HAL_GPIO_WritePin(Green_Led_GPIO_Port, Green_Led_Pin, GPIO_PIN_SET);
 }
