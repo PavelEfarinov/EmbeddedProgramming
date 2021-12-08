@@ -47,9 +47,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-enum LED_STATE {
-	GREEN, RED, YELLOW
-};
 
 /* USER CODE END PV */
 
@@ -62,10 +59,8 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-int increase_mode(int mode)
-{
-	if (mode >= 3)
-	{
+int increase_mode(int mode, size_t sequences_number) {
+	if (mode >= sequences_number - 1) {
 		return 0;
 	}
 	return mode + 1;
@@ -104,58 +99,101 @@ int main(void)
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  	light_sequence_t* sequences = malloc(sizeof(light_sequence_t) * 4);
+	size_t sequences_number = 4;
+	size_t place_to_create_new = 4;
 
-  	sequences[0].period = 500;
-  	sequences[0].last_tick= 0;
-  	sequences[0].sequence_size= 4;
-  	enum LED_STATE STATE_1[] = {GREEN, RED, GREEN, YELLOW};
-  	sequences[0].states = STATE_1;
+	light_sequence_t **sequences = malloc(sizeof(light_sequence_t*) * 8);
 
-  	sequences[1].period = 200;
-  	sequences[1].last_tick= 0;
-  	sequences[1].sequence_size= 3;
-  	enum LED_STATE STATE_2[] = {GREEN, YELLOW, RED};
-  	sequences[1].states = STATE_2;
+	for (int i = 0; i < sequences_number; ++i) {
+		sequences[i] = malloc(sizeof(light_sequence_t));
+	}
+	for (int i = 4; i < 8; ++i) {
+		sequences[i] = 0;
+	}
+	sequences[0]->period = 500;
+	sequences[0]->last_tick = 0;
+	sequences[0]->sequence_size = 4;
+	enum LED_STATE STATE_1[] = { GREEN, RED, GREEN, YELLOW };
+	sequences[0]->states = STATE_1;
 
+	sequences[1]->period = 200;
+	sequences[1]->last_tick = 0;
+	sequences[1]->sequence_size = 3;
+	enum LED_STATE STATE_2[] = { GREEN, YELLOW, RED };
+	sequences[1]->states = STATE_2;
 
-  	sequences[2].period = 500;
-  	sequences[2].last_tick= 0;
-  	sequences[2].sequence_size= 4;
-  	sequences[2].states = STATE_1;
+	sequences[2]->period = 5000;
+	sequences[2]->last_tick = 0;
+	sequences[2]->sequence_size = 2;
+	enum LED_STATE STATE_3[] = { GREEN, RED };
+	sequences[2]->states = STATE_3;
 
-  	sequences[3].period = 2000;
-  	sequences[3].last_tick= 0;
-  	sequences[3].sequence_size= 3;
-  	sequences[3].states = STATE_2;
+	sequences[3]->period = 75;
+	sequences[3]->last_tick = 0;
+	sequences[3]->sequence_size = 6;
+	enum LED_STATE STATE_4[] = { YELLOW, GREEN, YELLOW, RED, GREEN, RED };
+	sequences[3]->states = STATE_4;
 
 	int current_mode = 0, button_is_held = 0;
-	uint32_t current_tick = HAL_GetTick(), start_tick = HAL_GetTick(), sequence_tick = 0;
+	uint32_t current_tick = HAL_GetTick(), start_tick = HAL_GetTick(),
+			sequence_tick = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
 		current_tick = HAL_GetTick();
-		sequence_tick = (current_tick - start_tick + sequences[current_mode].last_tick);
+		if (current_tick - start_tick < 0) {
+			start_tick = HAL_GetTick();
+		}
+		sequence_tick = (current_tick - start_tick
+				+ sequences[current_mode]->last_tick);
 
 		uart_command_result_t uart_command = process_uart_input();
-		if(uart_command.result_type == UART_RESULT_SET)
-		{
-			int new_mode = *(int*)uart_command.result_data;
-			if(new_mode > 0 && new_mode <= 4)
-			{
-				current_mode = new_mode - 1;
-				sequences[current_mode].last_tick = sequence_tick % (sequences[current_mode].period * sequences[current_mode].sequence_size);
-				current_mode = new_mode - 1;
+
+		if (uart_command.result_type == UART_RESULT_SET) {
+			int *new_mode = (int*) uart_command.result_data;
+			if (*new_mode > 0 && *new_mode <= sequences_number) {
+				sequences[current_mode]->last_tick = sequence_tick
+						% (sequences[current_mode]->period
+								* sequences[current_mode]->sequence_size);
+				current_mode = *new_mode - 1;
 				start_tick = current_tick;
 			}
 
 			free(uart_command.result_data);
+		} else if (uart_command.result_type == UART_RESULT_NEW) {
+			if (sequences[place_to_create_new] != 0) {
+				free(sequences[place_to_create_new]->states);
+				free(sequences[place_to_create_new]);
+			}
+			light_sequence_t *got_sequence =
+					(light_sequence_t*) uart_command.result_data;
+
+			sequences[place_to_create_new] = got_sequence;
+			sequences[place_to_create_new]->last_tick = 0;
+
+			send_uart_int(sequences[place_to_create_new]->period);
+			send_uart_int(sequences[place_to_create_new]->sequence_size);
+
+			if (place_to_create_new == 7) {
+				place_to_create_new = 4;
+			} else {
+				place_to_create_new++;
+			}
+			if (sequences_number < 8) {
+				sequences_number++;
+			}
+//			send_uart_int(sequences_number);
+//			send_uart_int(place_to_create_new);
 		}
 
-		int step = (sequence_tick / sequences[current_mode].period) % sequences[current_mode].sequence_size;
-		switch (sequences[current_mode].states[step]) {
+		int step = (sequence_tick / sequences[current_mode]->period)
+				% sequences[current_mode]->sequence_size;
+
+		reset_leds();
+		HAL_Delay(1);
+		switch (sequences[current_mode]->states[step]) {
 		case GREEN:
 			turn_on_only_green();
 			break;
@@ -165,16 +203,18 @@ int main(void)
 		case YELLOW:
 			turn_on_only_yellow();
 			break;
+		case BLACK:
+			reset_leds();
+			break;
 		}
-		if(is_button_pressed() && !button_is_held)
-		{
-			sequences[current_mode].last_tick = sequence_tick % (sequences[current_mode].period * sequences[current_mode].sequence_size);
-			current_mode = increase_mode(current_mode);
+		if (is_button_pressed() && !button_is_held) {
+			sequences[current_mode]->last_tick = sequence_tick
+					% (sequences[current_mode]->period
+							* sequences[current_mode]->sequence_size);
+			current_mode = increase_mode(current_mode, sequences_number);
 			start_tick = current_tick;
 			button_is_held = 1;
-		}
-		else if (!is_button_pressed() && button_is_held)
-		{
+		} else if (!is_button_pressed() && button_is_held) {
 			button_is_held = 0;
 		}
     /* USER CODE END WHILE */

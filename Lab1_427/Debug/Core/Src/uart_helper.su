@@ -1,1 +1,9 @@
-uart_helper.c:7:23:process_uart_input	64	dynamic
+uart_helper.c:10:6:HAL_UART_RxCpltCallback	16	static
+uart_helper.c:14:6:send_uart	16	static
+uart_helper.c:25:6:send_uart_str	24	static
+uart_helper.c:34:6:send_uart_int	72	static
+uart_helper.c:41:5:is_new_command	24	static
+uart_helper.c:46:5:is_set_command	24	static
+uart_helper.c:50:5:is_set_interrupt_command	24	static
+uart_helper.c:55:19:read_uart	24	static
+uart_helper.c:69:23:process_uart_input	72	dynamic

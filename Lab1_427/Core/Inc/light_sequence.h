@@ -8,6 +8,9 @@
 #ifndef INC_LIGHT_SEQUENCE_H_
 #define INC_LIGHT_SEQUENCE_H_
 
+enum LED_STATE {
+	GREEN, RED, YELLOW, BLACK
+};
 
 typedef struct light_sequence {
 	int period;
